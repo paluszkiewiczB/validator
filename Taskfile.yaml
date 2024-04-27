@@ -1,0 +1,54 @@
+version: 3
+
+env:
+  GORACE: halt_on_error=1,history_size=2
+  GOCOVERDIR: tmp/cover
+
+tasks:
+  test:
+    desc: "Runs tests"
+    deps:
+      - gen
+    cmds:
+      - go test -race -count=1 -v ./...
+
+  fmt:
+    desc: "Reformats the source code"
+    cmds:
+      - go run mvdan.cc/gofumpt -extra -l -w .
+
+  lint:
+    desc: "Lints the source code"
+    cmds:
+      - go run github.com/editorconfig-checker/editorconfig-checker/cmd/editorconfig-checker
+      - go run github.com/golangci/golangci-lint/cmd/golangci-lint run ./...
+      - go run github.com/quasilyte/go-consistent ./...
+
+  gen:
+    desc: "Generate the source code"
+    deps:
+      - dep
+    cmds:
+      - go generate ./...
+
+  dep:
+    desc: "Download dependencies"
+    cmds:
+      - go mod tidy
+      - go mod download
+    sources:
+      - go.mod
+      - go.sum
+      - ./internal/tools/go.mod
+      - ./internal/tools/go.sum
+
+  init-tools:
+    dir: tools
+    cmds:
+      - go mod tidy
+      - go mod verify
+      - go generate -x
+
+  default:
+    cmds:
+      - task -l
