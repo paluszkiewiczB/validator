@@ -16,5 +16,5 @@ go run github.com/paluszkiewiczB/validator -in source.go -out destination.go -ou
 ## Local
 
 ```bash
-task 
+task
 ```
