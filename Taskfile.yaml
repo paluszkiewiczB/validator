@@ -42,12 +42,10 @@ tasks:
       - ./internal/tools/go.mod
       - ./internal/tools/go.sum
 
-  init-tools:
-    dir: tools
+  setup:
+    desc: "Setup the project"
     cmds:
-      - go mod tidy
-      - go mod verify
-      - go generate -x
+      - git config --local core.hooksPath .githooks/
 
   default:
     cmds:

@@ -1,6 +1,14 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
+
+source ~/.profile
+echo "$SHELL"
+ps -p $$
+echo "$PATH"
+
+env | grep PATH
+env | grep -i GO
 
 task lint
 task test
