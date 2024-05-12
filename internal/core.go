@@ -123,7 +123,13 @@ func FindStructs(f *ast.File) ([]Struct, error) {
 	})
 
 	l.Debug("finished finding structs", "map", structs)
-	return maps.Values(structs), nil
+
+	slice := maps.Values(structs)
+	slices.SortFunc(slice, func(a, b Struct) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	return slice, nil
 }
 
 func mergeStructs(a, b Struct) Struct {
