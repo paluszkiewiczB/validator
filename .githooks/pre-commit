@@ -2,13 +2,10 @@
 
 set -e
 
-source ~/.profile
-echo "$SHELL"
-ps -p $$
-echo "$PATH"
-
-env | grep PATH
-env | grep -i GO
+# fix for IntelliJ not loading .profile
+if [[ -f "$HOME/.profile" ]]; then
+	source "$HOME/.profile"
+fi
 
 task lint
 task test
