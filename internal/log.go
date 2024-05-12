@@ -13,7 +13,7 @@ func UseSlog() {
 	Log = slogLog{logger: slog.New(skipPc{Handler: slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slog.LevelDebug,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Key == "time" || a.Key == "level" {
 				return slog.Attr{}
 			}

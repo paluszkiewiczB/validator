@@ -1,2 +1,7 @@
 tmp
 .task
+.idea
+
+.vscode
+.history
+.vsix

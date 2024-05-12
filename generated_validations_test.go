@@ -1,9 +1,9 @@
-package main_test
+package // File generated automatically by validator. DO NOT EDIT.
+main_test
 
 import "errors"
 
 // Validate implements Validator.
-// Method generated automatically. DO NOT EDIT.
 func (r Required) Validate() error {
 	if len(r.String) == 0 {
 		return errors.New("field \"String\" is required")
@@ -21,7 +21,6 @@ func (r Required) Validate() error {
 }
 
 // Validate implements Validator.
-// Method generated automatically. DO NOT EDIT.
 func (e Eqfield) Validate() error {
 	if e.Field2 != e.Field1 {
 		return errors.New("field \"Field2\" must be equal to \"Field1\"")
@@ -30,7 +29,6 @@ func (e Eqfield) Validate() error {
 }
 
 // Validate implements Validator.
-// Method generated automatically. DO NOT EDIT.
 func (g Gte) Validate() error {
 	if val, than := float64(g.Two), float64(g.One); val < than {
 		return errors.New("field \"Two\" must greater or equal than \"One\"")

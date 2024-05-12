@@ -3,6 +3,13 @@ package main_test
 
 import "testing"
 
+// Validator is an interface that must be implemented by all validation structs.
+type Validator interface {
+	Validate() error
+}
+
+var _ Validator = Required{}
+
 type Required struct {
 	String        string              `validate:"required"`
 	StringPointer *string             `validate:"required"`
@@ -52,6 +59,8 @@ func Test_Required(t *testing.T) {
 	})
 }
 
+var _ Validator = Eqfield{}
+
 type Eqfield struct {
 	Field1 string
 	Field2 string `validate:"eqfield=Field1"`
@@ -72,6 +81,8 @@ func Test_Eqfield(t *testing.T) {
 		}
 	})
 }
+
+var _ Validator = Gte{}
 
 type Gte struct {
 	One int

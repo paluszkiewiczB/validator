@@ -18,14 +18,6 @@ type Struct struct {
 	Ast    *ast.StructType
 }
 
-func NewStruct(s *ast.StructType) Struct {
-	return Struct{
-		Name:   "",
-		Fields: nil,
-		Ast:    s,
-	}
-}
-
 type Field struct {
 	Name        string
 	Type        Type
@@ -46,6 +38,8 @@ func (f Field) IsSlice() string {
 	return fmt.Sprintf("%s %s", f.Name, f.Type)
 }
 
+// Type is a parsed struct field type.
+// TODO: figure out how to handle alias types `type MyString string` and `type MyString = string`.
 type Type string
 
 func (t Type) IsString() bool {
@@ -73,66 +67,15 @@ func (t Type) IsPtr() bool {
 type Validations map[string][]string
 
 func ParseValidations(tag string) (Validations, error) {
-	l := Log.With("tag", tag)
-	l.Debug("parsing validations")
-
-	if len(tag) < 2 || tag[0] != '`' || tag[len(tag)-1] != '`' {
-		return nil, fmt.Errorf("tag struct must be a raw string, got: %q", tag)
+	state := newParseState()
+	for i, c := range tag {
+		err := state.accept(c)
+		if err != nil {
+			return nil, fmt.Errorf("parsing tag: %q[%d] - rune %q,  %w", tag, i, string(c), err)
+		}
 	}
 
-	// trim backquotes: `
-	tag = tag[1 : len(tag)-1]
-	l.Debug("trimmed backquotes", "tag", tag)
-
-	// format is: `validate:"required" json:"name" xml:"ftw"`
-	split := strings.Split(tag, " ")
-	for _, tagPair := range split {
-		l := l.With("tagPair", tagPair)
-		l.Debug("parsing tag pair")
-		// format is: `validate:"required"`
-		kv := strings.SplitN(tagPair, ":", 2)
-		if len(kv) == 1 && kv[0] == "validate" {
-			return nil, fmt.Errorf("tag 'validate' must be followed by quoted validations, got: %q", tag)
-		}
-
-		if kv[0] != "validate" {
-			l.Debug("tag is not 'validate', continuing")
-			continue
-		}
-
-		v := kv[1]
-		l = l.With("value", v)
-		if len(v) < 2 {
-			return nil, fmt.Errorf("validation must be quoted, but does not even have 4 chars, got: %q", v)
-		}
-
-		if start, end := v[:1], v[len(v)-1:]; start != `"` || end != `"` {
-			l.Debug("not quoted", "start", start, "end", end)
-			return nil, fmt.Errorf("validation must be quoted, got: %q starting with: %s, ending with: %s", v, start, end)
-		}
-
-		opts := v[1 : len(v)-1]
-		// format for value is: "required,gt=0,lt=100"
-		validations := strings.Split(opts, ",")
-		l.Debug("options split by comma", "validations", validations)
-		out := make(Validations)
-		for _, rawValidation := range validations {
-			split := strings.SplitN(rawValidation, "=", 2)
-			switch len(split) {
-			case 1:
-				out[split[0]] = nil
-			case 2:
-				out[split[0]] = append(out[split[0]], split[1])
-			default:
-				panic("unexpected split length")
-			}
-		}
-
-		return out, nil
-	}
-
-	// 'validate' tag not found
-	return nil, nil
+	return state.build()
 }
 
 func FindStructs(f *ast.File) ([]Struct, error) {
@@ -237,9 +180,34 @@ const (
 	Gte      = "gte"
 )
 
+// deprecated: use Generator instead.
 type ValidatorFunc func(key string, str Struct, field Field) (ast.Stmt, error)
 
-func Validator(validation string) ValidatorFunc {
+func (f ValidatorFunc) AsGenerator() Generator {
+	return GeneratorFunc(func(key string, str Struct, field Field) (Generated, error) {
+		stmt, err := f(key, str, field)
+		return Generated{Stmts: []ast.Stmt{stmt}}, err
+	})
+}
+
+type Generator interface {
+	Generate(key string, str Struct, field Field) (Generated, error)
+}
+
+type Generated struct {
+	// Stmts are the pieces of generated code
+	Stmts []ast.Stmt
+	// Imports are the import paths required by the generated Stmts
+	Imports []string
+}
+
+type GeneratorFunc func(key string, str Struct, field Field) (Generated, error)
+
+func (f GeneratorFunc) Generate(key string, str Struct, field Field) (Generated, error) {
+	return f(key, str, field)
+}
+
+func GeneratorFor(validation string) Generator {
 	v, ok := validators[validation]
 	if !ok {
 		return nil
@@ -248,10 +216,10 @@ func Validator(validation string) ValidatorFunc {
 	return v
 }
 
-var validators = map[string]ValidatorFunc{
-	Required: forKey(Required, hasOptions(0, required)),
-	Eqfield:  forKey(Eqfield, hasOptions(1, eqfield)),
-	Gte:      forKey(Gte, hasOptions(1, gte)),
+var validators = map[string]Generator{
+	Required: forKey(Required, hasOptions(0, required)).AsGenerator(),
+	Eqfield:  forKey(Eqfield, hasOptions(1, eqfield)).AsGenerator(),
+	Gte:      forKey(Gte, hasOptions(1, gte)).AsGenerator(),
 }
 
 // TODO: always converts the field to float64, should be able to:

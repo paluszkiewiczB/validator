@@ -82,7 +82,7 @@ func Test_ParseValidations(t *testing.T) {
 func sameValidations(t *testing.T, a, b map[string][]string) {
 	t.Helper()
 	if len(a) != len(b) {
-		t.Errorf("expected length %d, got %d", len(a), len(b))
+		t.Errorf("expected length %d, got %d for: %v vs %v", len(a), len(b), a, b)
 		return
 	}
 

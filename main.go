@@ -8,10 +8,10 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"golang.org/x/exp/slices"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/paluszkiewiczB/validator/internal"
 
@@ -54,26 +54,31 @@ func main() {
 
 	methods := make([]ast.Decl, 0)
 	log.Printf("validations: %#v", structs)
+
+	var imports []string
 	for _, str := range structs {
 		var stmts []ast.Stmt
 
 		for _, field := range str.Fields {
 			for validation := range field.Validations {
-				validator := internal.Validator(validation)
-				if validator == nil {
+				gen := internal.GeneratorFor(validation)
+				if gen == nil {
 					panic(fmt.Sprintf("validator not found for struct: %q, field: %q, validation: %q", str.Name, field.Name, validation))
 				}
 
-				stmt, err := validator(validation, str, field)
+				generated, err := gen.Generate(validation, str, field)
 				if err != nil {
 					panic(err)
 				}
 
-				if stmt != nil {
-					stmts = append(stmts, stmt)
-				}
+				stmts = append(stmts, generated.Stmts...)
+				imports = append(imports, generated.Imports...)
 			}
 		}
+
+		// TODO: check if there are multiple structs and join them into single error (like errors.Join).
+		// Make sure the solution is compatible with go-playground/validator type validator.ValidationErrors,
+		// so it can be used with the translator?
 
 		stmts = append(stmts, internal.NoError())
 
@@ -82,7 +87,6 @@ func main() {
 				Doc: &ast.CommentGroup{
 					List: []*ast.Comment{
 						{Text: "// Validate implements Validator."},
-						{Text: "// Method generated automatically. DO NOT EDIT."},
 					},
 				},
 				Recv: &ast.FieldList{List: []*ast.Field{{Type: &ast.Ident{Name: internal.Receiver(str)}}}},
@@ -96,10 +100,23 @@ func main() {
 	file := &ast.File{
 		Name:  &ast.Ident{Name: *dstPkg},
 		Decls: methods,
+		Doc: &ast.CommentGroup{
+			List: []*ast.Comment{
+				// FIXME this comment is
+				{Text: "// File generated automatically by validator. DO NOT EDIT."},
+			},
+		},
 	}
 
 	dstFs := token.NewFileSet()
 	astutil.AddImport(dstFs, file, "errors")
+
+	slices.Sort(imports)
+	imports = slices.Compact(imports)
+	for _, imp := range imports {
+		astutil.AddImport(dstFs, file, imp)
+	}
+
 	err := format.Node(dst, dstFs, file)
 	if err != nil {
 		panic(err)
@@ -112,10 +129,6 @@ func main() {
 	}
 }
 
-func receiverName(typeName string) string {
-	return strings.ToLower(typeName[:1])
-}
-
 func Must(err error) {
 	if err != nil {
 		panic(err)
@@ -125,9 +138,4 @@ func Must(err error) {
 func Must2[V any](val V, err error) V {
 	Must(err)
 	return val
-}
-
-type Fooer struct {
-	Name  string `validate:"required"`
-	Other string
 }
